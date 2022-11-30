@@ -3,7 +3,9 @@ library(ggplot2)
 library(patchwork)
 library(plotly)
 
-data <- fread("ignore/Phoenix/20221122_CSVExport/20221122_CSVExport.txt")
+folder_name <- '20221129_IndianSchool'
+file_name <- paste0("ignore/Phoenix/", folder_name, '.txt')
+data <- fread(file_name)
 data[, TimeStamp := as.POSIXct(TimeStamp, tz = '', format = '%m-%d-%Y %H:%M:%OS')]
 
 options(digits.secs = 3L)
@@ -33,8 +35,9 @@ p2 <- ggplot(DT_eb) +
 p1 / p2
 
 # process data
-DT <- copy(data)[DeviceID == 46L & hour(TimeStamp) %in% c(7L) & minute(TimeStamp) <= 40, ]
-DT <- DT[Parameter %in% c(2L, 9L, 10L, 11L, 12L), ][order(TimeStamp)]
+DT <- copy(data)[DeviceID == 48L & hour(TimeStamp) %in% c(7L) & minute(TimeStamp) <= 50, ]
+DT <- DT[Parameter %in% c(2L, 9L, 10L, 11L, 12L), ][order(TimeStamp)] # westbound
+# DT <- DT[Parameter %in% c(6L, 17L, 18L, 19L, 20L), ][order(TimeStamp)] # eastbound
 DT$DeviceID <- NULL
 
 DT <- DT[min(which(DT$EventID == 10L)):max(which(DT$EventID == 10L)), ]
