@@ -3,25 +3,36 @@ library(ggplot2)
 library(patchwork)
 library(plotly)
 
-folder_name <- '20221129_IndianSchool'
+param_eb <- c(17, 18, 19, 20, 37, 38, 39, 40, 61, 62, 63, 64)
+param_wb <- c(9, 10, 11, 12, 29, 30, 31, 32, 53, 54, 55, 56)
+param_nb <- c(13, 14, 15, 16, 33, 34, 35, 36, 57, 58, 59, 60)
+param_sb <- c(21, 22, 23, 24, 41, 42, 43, 44)
+
+phase_eb <- 6L
+phase_wb <- 2L
+
+det_eb_stop <- c(17L, 18L, 19L, 20L)
+det_wb_stop <- c(9L, 10L, 11L, 12L)
+det_eb_advance <- c(37L, 38L, 39L, 40L)
+det_wb_advance <- c(29L, 30L, 31L, 32L)
+
+am_peak <- c(6L, 7L, 8L)
+pm_peak <- c(15L, 16L, 17L)
+
+folder_name <- '20221201_IndianSchool'
 file_name <- paste0("ignore/Phoenix/", folder_name, '.txt')
 data <- fread(file_name)
 data[, TimeStamp := as.POSIXct(TimeStamp, tz = '', format = '%m-%d-%Y %H:%M:%OS')]
 
 options(digits.secs = 3L)
 
-param_eb <- c(17, 18, 19, 20, 37, 38, 39, 40, 61, 62, 63, 64)
-param_wb <- c(9, 10, 11, 12, 29, 30, 31, 32, 53, 54, 55, 56)
-param_nb <- c(13, 14, 15, 16, 33, 34, 35, 36, 57, 58, 59, 60)
-param_sb <- c(21, 22, 23, 24, 41, 42, 43, 44)
-
-# # check detector configuration
-# DT <- copy(data)[DeviceID == 49L & hour(TimeStamp) %in% c(6L, 7L, 8L) & Parameter %in% param_eb & EventID == 82L, ]
-# DT[, .N, by = Parameter][order(Parameter)]
+# check detector configuration
+DT <- copy(data)[hour(TimeStamp) %in% am_peak & Parameter %in% param_wb & EventID == 82L, ]
+DT[, .N, by = c('DeviceID', 'Parameter')][order(DeviceID, Parameter)]
 
 # check data continuity
-DT_eb <- copy(data)[hour(TimeStamp) %in% c(6L, 7L, 8L) & Parameter %in% param_eb & EventID == 82L, ]
-DT_wb <- copy(data)[hour(TimeStamp) %in% c(6L, 7L, 8L) & Parameter %in% param_wb & EventID == 82L, ]
+DT_eb <- copy(data)[hour(TimeStamp) %in% am_peak & Parameter %in% param_eb & EventID == 82L, ]
+DT_wb <- copy(data)[hour(TimeStamp) %in% am_peak & Parameter %in% param_wb & EventID == 82L, ]
 
 p1 <- ggplot(DT_wb) + 
     geom_point(aes(TimeStamp, DeviceID)) + 
@@ -34,11 +45,21 @@ p2 <- ggplot(DT_eb) +
 
 p1 / p2
 
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Purdue Coordination Diagram --------------------------------------------------
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 # process data
-DT <- copy(data)[DeviceID == 48L & hour(TimeStamp) %in% c(7L) & minute(TimeStamp) <= 50, ]
-DT <- DT[Parameter %in% c(2L, 9L, 10L, 11L, 12L), ][order(TimeStamp)] # westbound
-# DT <- DT[Parameter %in% c(6L, 17L, 18L, 19L, 20L), ][order(TimeStamp)] # eastbound
+
+DT <- copy(data)[DeviceID == 49L & hour(TimeStamp) %in% c(7L) & minute(TimeStamp) <= 50, ]
 DT$DeviceID <- NULL
+
+DT <- DT[Parameter %in% c(phase_wb, det_wb_stop), ][order(TimeStamp)] # westbound
+# DT <- DT[Parameter %in% c(6L, 17L, 18L, 19L, 20L), ][order(TimeStamp)] # eastbound
+
+# remove observations with det event and phase parameter 
+DT <- DT[!(EventID == 82L & Parameter == phase_wb), ]
 
 DT <- DT[min(which(DT$EventID == 10L)):max(which(DT$EventID == 10L)), ]
 DT <- DT[.(c(10L, 1L, 82L)), on = 'EventID'] # order data by EventID
