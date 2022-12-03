@@ -1,4 +1,5 @@
 library(data.table)
+library(plotly)
 
 param_eb <- c(17, 18, 19, 20, 37, 38, 39, 40, 61, 62, 63, 64)
 param_wb <- c(9, 10, 11, 12, 29, 30, 31, 32, 53, 54, 55, 56)
@@ -50,3 +51,56 @@ CL <- round(as.numeric(difftime(shift(yellowStartTime, type = 'lead'), yellowSta
 
 GreenTime <- round(as.numeric(difftime(greenStartTime, head(yellowStartTime, -1L))), 3L)
 GreenTime <- append(GreenTime, NA)
+
+
+# detector actuation events
+
+det <- copy(data)[EventID %in% c(82L, 81L) & Parameter %in% det_wb_stop, ][order(TimeStamp)]
+det <- det[between(TimeStamp, minCycleTime, maxCycleTime), ][order(TimeStamp)]
+
+det_dir_loc <- unique(det$Parameter)
+
+# get detection parameters for each lane-by-lane detector
+getOHG <- function(det_lane) {
+    det1 <- copy(det)[Parameter == det_lane, ]
+    det1 <- det1[min(which(EventID == 82L)):max(which(EventID == 81L)), ]
+    
+    detOn <- det1$TimeStamp[det1$EventID == 82L]
+    detOff <- det1$TimeStamp[det1$EventID == 81L]
+    
+    Headway <- round(as.numeric(difftime(shift(detOn, type = 'lead'), detOn, units = 'secs')), 3L)
+    ODT <- round(as.numeric(difftime(detOff, detOn, units = 'secs')), 3L)
+    Gap <- round(as.numeric(difftime(shift(detOn, type = 'lead'), detOff, units = 'secs')), 3L)
+    
+    return(list(Headway = Headway, ODT = ODT, Gap = Gap))
+}
+
+
+# merge two events data sets
+
+DT <- rbindlist(list(phase, det))[order(TimeStamp)]
+
+DT[, Signal := fifelse(EventID %in% c(8L, 10L, 1L), EventID, as.integer(NA))]
+DT <- DT[, setnafill(.SD, type = 'locf', cols = 'Signal')]
+
+DT[, Signal := factor(as.factor(fcase(Signal == 1L, 'G',
+                                      Signal == 8L, 'Y',
+                                      Signal == 10L, 'R')), levels = c('G', 'Y', 'R'))]
+
+DT$Cycle[DT$EventID == 8L] <- Cycle
+DT$CL[DT$EventID == 8L] <- CL
+
+DT$YellowStart[DT$EventID == 8L] <- yellowStartTime
+DT$RedStart[DT$EventID == 8L] <- append(redStartTime, NA)
+DT$GreenStart[DT$EventID == 8L] <- append(greenStartTime, NA)
+DT$GreenTime[DT$EventID == 8L] <- GreenTime
+
+DT <- DT[, setnafill(.SD, type = 'locf', cols = c('Cycle', 'CL', 'GreenStart', 'YellowStart', 'RedStart', 'GreenTime'))]
+
+origin <- '1970-01-01'
+DT[, YellowStart := as.POSIXct(YellowStart, origin = origin)]
+DT[, RedStart := as.POSIXct(RedStart, origin = origin)]
+DT[, GreenStart := as.POSIXct(GreenStart, origin = origin)]
+
+DT[, AIC := round(as.numeric(TimeStamp - YellowStart), 3L)]
+DT[, TUG := round(as.numeric(GreenStart - TimeStamp), 3L)]
