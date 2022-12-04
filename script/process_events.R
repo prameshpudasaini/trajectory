@@ -25,7 +25,7 @@ data[, TimeStamp := as.POSIXct(TimeStamp, tz = '', format = '%m-%d-%Y %H:%M:%OS'
 
 options(digits.secs = 3L)
 
-data <- data[DeviceID == 49L & hour(TimeStamp) %in% c(7L) & minute(TimeStamp) <= 50, ]
+data <- data[DeviceID == 48L & hour(TimeStamp) %in% c(7L) & minute(TimeStamp) <= 50, ]
 data$DeviceID <- NULL
 
 
@@ -58,7 +58,7 @@ GreenTime <- append(GreenTime, NA)
 det <- copy(data)[EventID %in% c(82L, 81L) & Parameter %in% det_wb_stop, ][order(TimeStamp)]
 det <- det[between(TimeStamp, minCycleTime, maxCycleTime), ][order(TimeStamp)]
 
-det_dir_loc <- unique(det$Parameter)
+det_dir_loc <- sort(unique(det$Parameter))
 
 # get detection parameters for each lane-by-lane detector
 getOHG <- function(det_lane) {
@@ -104,3 +104,57 @@ DT[, GreenStart := as.POSIXct(GreenStart, origin = origin)]
 
 DT[, AIC := round(as.numeric(TimeStamp - YellowStart), 3L)]
 DT[, TUG := round(as.numeric(GreenStart - TimeStamp), 3L)]
+
+
+# signal status change by lane
+
+getSSC <- function(det_lane) {
+    SSC82 <- as.character(DT$Signal[DT$EventID == 82L & DT$Parameter == det_lane])
+    SSC81 <- as.character(DT$Signal[DT$EventID == 81L & DT$Parameter == det_lane])
+    SSC_check <- length(SSC82) == length(SSC81)
+    
+    SSC <- paste0(SSC82, SSC81)
+    
+    return(list(SSC_check = SSC_check, SSC = SSC))
+}
+
+for (i in seq_along(det_wb_stop)) {
+    print(paste0(i, ': ', det_dir_loc[i], ': ', getSSC(det_dir_loc[i])$SSC_check))
+    
+    DT$SSC[DT$EventID == 82L & DT$Parameter == det_dir_loc[i]] <- getSSC(det_dir_loc[i])$SSC
+    
+    DT$Headway[DT$EventID == 82L & DT$Parameter == det_dir_loc[i]] <- getOHG(det_dir_loc[i])$Headway
+    DT$ODT[DT$EventID == 82L & DT$Parameter == det_dir_loc[i]] <- getOHG(det_dir_loc[i])$ODT
+    DT$Gap[DT$EventID == 82L & DT$Parameter == det_dir_loc[i]] <- getOHG(det_dir_loc[i])$Gap
+}
+
+DT <- DT[EventID == 82L, ][order(TimeStamp)]
+
+SSC_levels <- c('YY', 'YR', 'RR', 'RG', 'GG', 'GY')
+DT[, SSC := factor(as.factor(SSC), levels = SSC_levels)]
+
+DT[, .(count = .N, 
+       min_ODT = min(ODT),
+       max_ODT = max(ODT),
+       mean_ODT = round(mean(ODT), 3L),
+       median_ODT = median(ODT), 
+       sd_ODT = round(sd(ODT), 4L)), by = c('SSC', 'Parameter')][order(SSC, Parameter)]
+
+DT <- DT[Parameter != det_dir_loc[1], ]
+
+signal_color <- c('orange', 'brown', 'red', 'black', 'forestgreen', 'limegreen')
+
+# ODT by SSC
+plot_ly(DT, type = 'box', y = ~ODT, color = ~SSC, colors = signal_color)
+
+# ODT vs gap
+plot_ly(DT, type = 'scatter', x = ~ODT, y = ~Gap, color = ~SSC,
+        mode = 'markers', colors = signal_color, marker = list(size = 5))
+
+# ODT vs TUG
+plot_ly(DT, type = 'scatter', x = ~ODT, y = ~TUG, color = ~SSC,
+        mode = 'markers', colors = signal_color, marker = list(size = 5))
+
+# ODT vs AIC
+plot_ly(DT, type = 'scatter', x = ~ODT, y = ~AIC, color = ~SSC,
+        mode = 'markers', colors = signal_color, marker = list(size = 5))
