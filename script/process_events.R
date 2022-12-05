@@ -25,7 +25,7 @@ data[, TimeStamp := as.POSIXct(TimeStamp, tz = '', format = '%m-%d-%Y %H:%M:%OS'
 
 options(digits.secs = 3L)
 
-data <- data[DeviceID == 48L & hour(TimeStamp) %in% c(7L) & minute(TimeStamp) <= 50, ]
+data <- data[DeviceID == 49L & hour(TimeStamp) %in% c(7L) & minute(TimeStamp) <= 50, ]
 data$DeviceID <- NULL
 
 
@@ -102,6 +102,8 @@ DT[, YellowStart := as.POSIXct(YellowStart, origin = origin)]
 DT[, RedStart := as.POSIXct(RedStart, origin = origin)]
 DT[, GreenStart := as.POSIXct(GreenStart, origin = origin)]
 
+# DT$RedStart - head(DT$YellowStart, -1L) # check yellow times
+
 DT[, AIC := round(as.numeric(TimeStamp - YellowStart), 3L)]
 DT[, TUG := round(as.numeric(GreenStart - TimeStamp), 3L)]
 
@@ -128,7 +130,10 @@ for (i in seq_along(det_wb_stop)) {
     DT$Gap[DT$EventID == 82L & DT$Parameter == det_dir_loc[i]] <- getOHG(det_dir_loc[i])$Gap
 }
 
-DT <- DT[EventID == 82L, ][order(TimeStamp)]
+DT <- DT[EventID == 82L, ][order(Parameter, TimeStamp)]
+
+DT[, SSC_lane := shift(SSC, type = 'lead'), by = as.factor(Parameter)]
+DT[, SSC_lane := paste0(SSC, '-', SSC_lane)]
 
 SSC_levels <- c('YY', 'YR', 'RR', 'RG', 'GG', 'GY')
 DT[, SSC := factor(as.factor(SSC), levels = SSC_levels)]
@@ -140,7 +145,7 @@ DT[, .(count = .N,
        median_ODT = median(ODT), 
        sd_ODT = round(sd(ODT), 4L)), by = c('SSC', 'Parameter')][order(SSC, Parameter)]
 
-DT <- DT[Parameter != det_dir_loc[1], ]
+DT <- DT[order(TimeStamp)][Parameter != det_dir_loc[1], ]
 
 signal_color <- c('orange', 'brown', 'red', 'black', 'forestgreen', 'limegreen')
 
