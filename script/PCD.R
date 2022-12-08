@@ -17,8 +17,9 @@ det_wb_stop <- c(9L, 10L, 11L, 12L)
 det_wb_advance <- c(27L, 28L, 29L)
 
 # read data
-folder_name <- '20221207_IndianSchool'
+folder_name <- '20221208_IndianSchool'
 file_name <- paste0("ignore/Phoenix/", folder_name, '.txt')
+
 data <- fread(file_name)
 data[, TimeStamp := as.POSIXct(TimeStamp, tz = '', format = '%m-%d-%Y %H:%M:%OS')]
 
@@ -80,47 +81,84 @@ checkDataCont <- function(peak, det_type) {
 }
 
 checkDataCont(am_peak, 'stop')
+checkDataCont(am_peak, 'advance')
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Purdue Coordination Diagram --------------------------------------------------
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# process data
-device <- 49L
-hour <- 8L
-minute <- 35L
+getPCD <- function(device, det_type, dir, hour, minute) {
+    
+    if (det_type == 'stop') {
+        param_eb <- det_eb_stop
+        param_wb <- det_wb_stop
+    } else {
+        param_eb <- det_eb_advance
+        param_wb <- det_wb_advance
+    }
+    
+    if (dir == 'EB') {
+        phase <- phase_eb
+        param <- param_eb
+    } else {
+        phase <- phase_wb
+        param <- param_wb
+    }
+    
+    DT <- copy(data)[DeviceID == device & Parameter %in% c(phase, param) &
+                         hour(TimeStamp) %in% hour & minute(TimeStamp) <= minute, ]
+    DT$DeviceID <- NULL
+    
+    # remove observations with det event and phase parameter
+    DT <- DT[!(EventID == 82L & Parameter == phase), ][order(TimeStamp)]
+    
+    DT <- DT[min(which(DT$EventID == 10L)):max(which(DT$EventID == 10L)), ]
+    DT <- DT[.(c(10L, 1L, 82L)), on = 'EventID'] # order data by EventID
+    
+    DT[, Cycle := .I]
+    DT[, CycleLength := abs(round(TimeStamp - shift(TimeStamp, type = 'lead'), 3L))]
+    DT[Cycle >= max(which(DT$EventID == 10L)), `:=`(Cycle = NA, CycleLength = NA)]
+    
+    DT <- DT[order(TimeStamp)][, setnafill(.SD, type = 'locf', cols = c('Cycle', 'CycleLength'))]
+    
+    DT[, Cycle := as.factor(Cycle)]
+    DT[, TimeInCycle := as.numeric(abs(round(TimeStamp - shift(TimeStamp), 3L))), by = Cycle]
+    DT[, TimeInCycle := cumsum(fifelse(is.na(TimeInCycle), 0, TimeInCycle)), by = Cycle]
+    DT[, TimeInCycle := as.difftime(TimeInCycle, units = 'secs')]
+    
+    DT[, GreenStart := TimeInCycle[EventID == 1L], by = Cycle]
+    DT[, AIC := fcase(EventID == 82L, TimeInCycle)]
+    
+    DT[, Parameter := as.factor(Parameter)][]
+    
+    plot <- plot_ly(DT, x = ~TimeStamp) |> 
+        add_lines(y = ~CycleLength, line = list(shape = 'hv', color = 'red')) |> 
+        add_lines(y = ~GreenStart, line = list(shape = 'hv', color = 'forestgreen')) |> 
+        add_markers(y = ~AIC, symbol = ~Parameter, marker = list(size = 3L, color = 'black')) |> 
+        layout(showlegend = FALSE,
+               xaxis = list(title = 'Time of Day'),
+               yaxis = list(title = 'Time in Cycle (s)'))
+    
+    return(list(DT = DT, plot = plot))
+}
 
-DT <- copy(data)[DeviceID == device & hour(TimeStamp) %in% hour & minute(TimeStamp) <= minute, ]
-DT$DeviceID <- NULL
+# 19th Ave
+getPCD(46, 'stop', 'EB', 7, 35)$plot
+getPCD(46, 'advance', 'EB', 7, 35)$plot
+getPCD(46, 'stop', 'WB', 7, 35)$plot
+getPCD(46, 'advance', 'WB', 7, 35)$plot
 
-DT <- DT[Parameter %in% c(phase_wb, det_wb_stop), ][order(TimeStamp)] # westbound
-# DT <- DT[Parameter %in% c(6L, 17L, 18L, 19L, 20L), ][order(TimeStamp)] # eastbound
+# 15th Ave
+getPCD(47, 'stop', 'EB', 7, 35)$plot
+getPCD(47, 'stop', 'WB', 7, 35)$plot
 
-# remove observations with det event and phase parameter 
-DT <- DT[!(EventID == 82L & Parameter == phase_wb), ]
+# 7th Ave
+getPCD(48, 'stop', 'EB', 7, 35)$plot
+getPCD(48, 'advance', 'EB', 7, 35)$plot
+getPCD(48, 'stop', 'WB', 7, 35)$plot
+getPCD(48, 'advance', 'WB', 7, 35)$plot
 
-DT <- DT[min(which(DT$EventID == 10L)):max(which(DT$EventID == 10L)), ]
-DT <- DT[.(c(10L, 1L, 82L)), on = 'EventID'] # order data by EventID
-
-DT[, Cycle := .I]
-DT[, CycleLength := abs(round(TimeStamp - shift(TimeStamp, type = 'lead'), 3L))]
-DT[Cycle >= max(which(DT$EventID == 10L)), `:=`(Cycle = NA, CycleLength = NA)]
-
-DT <- DT[order(TimeStamp)][, setnafill(.SD, type = 'locf', cols = c('Cycle', 'CycleLength'))]
-
-DT[, Cycle := as.factor(Cycle)]
-DT[, TimeInCycle := as.numeric(abs(round(TimeStamp - shift(TimeStamp), 3L))), by = Cycle]
-DT[, TimeInCycle := cumsum(fifelse(is.na(TimeInCycle), 0, TimeInCycle)), by = Cycle]
-DT[, TimeInCycle := as.difftime(TimeInCycle, units = 'secs')]
-
-DT[, GreenStart := TimeInCycle[EventID == 1L], by = Cycle]
-DT[, DetTimeInCycle := fcase(EventID == 82L, TimeInCycle)]
-
-plot_ly(DT, x = ~TimeStamp) |> 
-    add_lines(y = ~CycleLength, line = list(shape = 'hv', color = 'red')) |> 
-    add_lines(y = ~GreenStart, line = list(shape = 'hv', color = 'forestgreen')) |> 
-    add_markers(y = ~DetTimeInCycle, marker = list(size = 3L, color = 'black')) |> 
-    layout(showlegend = FALSE,
-           xaxis = list(title = 'Time of Day'),
-           yaxis = list(title = 'Time in Cycle (s)'))
+# 3rd Ave
+getPCD(49, 'stop', 'EB', 7, 35)$plot
+getPCD(49, 'stop', 'WB', 7, 35)$plot
