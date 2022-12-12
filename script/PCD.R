@@ -17,7 +17,7 @@ det_wb_stop <- c(9L, 10L, 11L, 12L)
 det_wb_advance <- c(27L, 28L, 29L)
 
 # read data
-folder_name <- '20221208_IndianSchool'
+folder_name <- '20221207_IndianSchool'
 file_name <- paste0("ignore/Phoenix/", folder_name, '.txt')
 
 data <- fread(file_name)
@@ -143,22 +143,25 @@ getPCD <- function(device, det_type, dir, hour, minute) {
     return(list(DT = DT, plot = plot))
 }
 
+hour <- 8L
+minute <- 35L
+
 # 19th Ave
-getPCD(46, 'stop', 'EB', 7, 35)$plot
-getPCD(46, 'advance', 'EB', 7, 35)$plot
-getPCD(46, 'stop', 'WB', 7, 35)$plot
-getPCD(46, 'advance', 'WB', 7, 35)$plot
+getPCD(46, 'stop', 'EB', hour, minute)$plot
+getPCD(46, 'advance', 'EB', hour, minute)$plot
+getPCD(46, 'stop', 'WB', hour, minute)$plot
+getPCD(46, 'advance', 'WB', hour, minute)$plot
 
 # 15th Ave
-getPCD(47, 'stop', 'EB', 7, 35)$plot
-getPCD(47, 'stop', 'WB', 7, 35)$plot
+getPCD(47, 'stop', 'EB', hour, minute)$plot
+getPCD(47, 'stop', 'WB', hour, minute)$plot
 
 # 7th Ave
-getPCD(48, 'stop', 'EB', 7, 35)$plot
-getPCD(48, 'advance', 'EB', 7, 35)$plot
-getPCD(48, 'stop', 'WB', 7, 35)$plot
-getPCD(48, 'advance', 'WB', 7, 35)$plot
+getPCD(48, 'stop', 'EB', hour, minute)$plot
+getPCD(48, 'advance', 'EB', hour, minute)$plot
+getPCD(48, 'stop', 'WB', hour, minute)$plot
+getPCD(48, 'advance', 'WB', hour, minute)$plot
 
 # 3rd Ave
-getPCD(49, 'stop', 'EB', 7, 35)$plot
-getPCD(49, 'stop', 'WB', 7, 35)$plot
+getPCD(49, 'stop', 'EB', hour, minute)$plot
+getPCD(49, 'stop', 'WB', hour, minute)$plot

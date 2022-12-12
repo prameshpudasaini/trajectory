@@ -2,7 +2,7 @@ import os
 import zipfile
 import pandas as pd
 
-folder_name = '20221128_IndianSchool'
+folder_name = '20221208_IndianSchool'
 dir_name = os.path.join(r"D:\GitHub\trajectory\ignore\Phoenix", folder_name)
 file_list = os.listdir(dir_name)
 
@@ -23,6 +23,6 @@ for file in file_list:
         df += [temp]
     i += 1
         
-output_path = dir_name + '\\' + folder_name + '.txt'
+output_path = dir_name + '.txt'
 
 pd.concat(df, ignore_index = True).to_csv(output_path, index = False, sep = '\t')
