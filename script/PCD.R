@@ -17,7 +17,7 @@ det_wb_stop <- c(9L, 10L, 11L, 12L)
 det_wb_advance <- c(27L, 28L, 29L)
 
 # read data
-folder_name <- '20221207_IndianSchool'
+folder_name <- '20221214_IndianSchool'
 file_name <- paste0("ignore/Phoenix/", folder_name, '.txt')
 
 data <- fread(file_name)
@@ -70,12 +70,16 @@ checkDataCont <- function(peak, det_type) {
     p1 <- ggplot(dt_eb) + 
         geom_point(aes(TimeStamp, DeviceID)) + 
         ylab('Eastbound') + 
-        theme(axis.title.x = element_blank())
+        theme(axis.title.x = element_blank(),
+              axis.title.y = element_text(size = 13),
+              axis.text = element_text(size = 12))
     
     p2 <- ggplot(dt_wb) + 
         geom_point(aes(TimeStamp, DeviceID)) + 
         ylab('Westbound') + 
-        theme(axis.title.x = element_blank())
+        theme(axis.title.x = element_blank(),
+              axis.title.y = element_text(size = 13),
+              axis.text = element_text(size = 12))
     
     return(p2 / p1)
 }
