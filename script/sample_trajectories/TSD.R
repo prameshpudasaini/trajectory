@@ -70,3 +70,51 @@ traj = rbindlist(list(traj1, traj2, traj3, traj4, traj5))
 
 traj[, TimeStamp := as.POSIXct('2022-12-14 08:00:00')]
 traj[, TimeStamp := TimeStamp + t]
+
+# plot
+size <- 1.5
+
+plot <- ggplot() + 
+    # 3rd
+    geom_linerange(aes(y = x, xmin = ymin, xmax = ymax), DT3, color = 'orange', size = size) + 
+    geom_linerange(aes(y = x, xmin = rmin, xmax = rmax), DT3, color = 'red', size = size) + 
+    geom_linerange(aes(y = x, xmin = gmin, xmax = gmax), DT3, color = 'limegreen', size = size) + 
+    # 7th
+    geom_linerange(aes(y = x, xmin = ymin, xmax = ymax), DT7, color = 'orange', size = size) + 
+    geom_linerange(aes(y = x, xmin = rmin, xmax = rmax), DT7, color = 'red', size = size) + 
+    geom_linerange(aes(y = x, xmin = gmin, xmax = gmax), DT7, color = 'limegreen', size = size) + 
+    # 15th
+    geom_linerange(aes(y = x, xmin = ymin, xmax = ymax), DT15, color = 'orange', size = size) + 
+    geom_linerange(aes(y = x, xmin = rmin, xmax = rmax), DT15, color = 'red', size = size) + 
+    geom_linerange(aes(y = x, xmin = gmin, xmax = gmax), DT15, color = 'limegreen', size = size) + 
+    # 19th
+    geom_linerange(aes(y = x, xmin = ymin, xmax = ymax), DT19, color = 'orange', size = size) + 
+    geom_linerange(aes(y = x, xmin = rmin, xmax = rmax), DT19, color = 'red', size = size) + 
+    geom_linerange(aes(y = x, xmin = gmin, xmax = gmax), DT19, color = 'limegreen', size = size) + 
+    # trajectory
+    geom_point(aes(TimeStamp, x), traj, size = 0.1) +
+    # theme
+    scale_y_continuous(breaks = c(dist_3, dist_7, dist_15, dist_19), 
+                       labels = c('3rd Ave', '7th Ave', '15th Ave', '19th Ave')) + 
+    labs(x = '', y = '') + 
+    theme(axis.text = element_text(size = 12, face = 'bold'),
+          axis.ticks = element_blank())
+plot
+
+ggsave(paste0("script/sample_trajectories/", "TSD.png"),
+       plot = plot,
+       units = "cm",
+       width = 35,
+       height = 21,
+       dpi = 600)
+
+# # calculations
+# tt1 <- tail(traj1$t, 1L) - head(traj1$t, 1L)
+# tt2 <- tail(traj2$t, 1L) - head(traj2$t, 1L)
+# tt3 <- tail(traj3$t, 1L) - head(traj3$t, 1L)
+# tt4 <- tail(traj4$t, 1L) - head(traj4$t, 1L)
+# tt5 <- tail(traj5$t, 1L) - head(traj5$t, 1L)
+# 
+# tt <- c(tt1, tt2, tt3, tt4, tt5)
+# mean(tt)
+# sd(tt)
