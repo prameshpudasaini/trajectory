@@ -19,16 +19,22 @@ DT <- DT[Det != 'adv', ]
 # plots
 signal_color <- c('orange', 'brown', 'red', 'black', 'forestgreen', 'limegreen')
 
-plot_ly(DT, type = 'box', y = ~ODT, color = ~SSC, colors = signal_color, boxmean = TRUE)
+plot_ly(DT, type = 'box', y = ~ODT, color = ~SSC, colors = signal_color, boxmean = TRUE) |> 
+    layout(yaxis = list(title = 'On-detector time (s)'),
+           xaxis = list(title = 'Signal status change'))
 
 plot_ly(DT, type = 'scatter', x = ~ODT, y = ~Gap, color = ~SSC,
-                   mode = 'markers', colors = signal_color, marker = list(size = 5))
+                   mode = 'markers', colors = signal_color, marker = list(size = 5)) |> 
+    layout(yaxis = list(title = 'Time gap (s)'),
+           xaxis = list(title = 'On-detector time (s)'))
 
 plot_ly(DT[!(SSC %in% c('GG', 'GY')), ], type = 'scatter', x = ~ODT, y = ~TUG, color = ~SSC,
                    mode = 'markers', colors = signal_color, marker = list(size = 5))
 
 plot_ly(DT, type = 'scatter', x = ~ODT, y = ~AIC, color = ~SSC,
-                   mode = 'markers', colors = signal_color, marker = list(size = 5))
+                   mode = 'markers', colors = signal_color, marker = list(size = 5)) |> 
+    layout(yaxis = list(title = 'Arrival in cycle (s)'),
+           xaxis = list(title = 'On-detector time (s)'))
 
 # box plot of ODT ratio by intersection
 plot_ly(DT, type = 'box', y = ~ODTR, color = ~Int, boxmean = TRUE)
