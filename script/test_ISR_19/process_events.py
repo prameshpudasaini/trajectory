@@ -19,10 +19,6 @@ start_time, end_time = '2022-12-14 07:40:00.0', '2022-12-14 08:20:00.0'
 df['TimeStamp'] = pd.to_datetime(df['TimeStamp'], format = '%m-%d-%Y %H:%M:%S.%f').sort_values()
 df = df[(df['TimeStamp'] > start_time) & (df['TimeStamp'] < end_time)]
 
-# check unique values
-df['EventID'].unique()
-df['Parameter'].unique()
-
 # =============================================================================
 # signal phase change events
 # =============================================================================
@@ -42,15 +38,14 @@ pdf.query('EventID in [8, 10, 1]', inplace = True)
 
 # indication start times
 yst = tuple((pdf.loc[pdf['EventID'] == 8])['TimeStamp']) # yellow
-rst = tuple((pdf.loc[pdf['EventID'] == 10])['TimeStamp']) # green
-gst = tuple((pdf.loc[pdf['EventID'] == 1])['TimeStamp']) # red
+rst = tuple((pdf.loc[pdf['EventID'] == 10])['TimeStamp']) # red
+gst = tuple((pdf.loc[pdf['EventID'] == 1])['TimeStamp']) # green
 
-Cycle = tuple(range(1, len(yst) + 1))
+Cycle = tuple(range(1, len(yst)))
 CycleLen = Vector(yst[1:]) - Vector(yst[:-1])
-CycleLen.append(None)
 
-GreenTime = Vector(gst) - Vector(yst[:-1])
-GreenTime.append(None)
+RedTime = Vector(gst) - Vector(rst)
+GreenTime = Vector(yst[1:]) - Vector(gst)
 
 # =============================================================================
 # detector actutation events
@@ -67,24 +62,85 @@ ddf = ddf[(ddf['TimeStamp'] > minCycleTime) & (ddf['TimeStamp'] < maxCycleTime)]
 ddf['Parameter'].value_counts(dropna = False).sort_values()    
 ddf.groupby(['Parameter'])['EventID'].value_counts()
 
-ddf9 = ddf.copy(deep = True)
-ddf9.query('Parameter == 11', inplace = True)
+# lane-specific parameters computation
+def computeParameters(lane):
+    ldf = ddf.copy(deep = True)
+    ldf.query('Parameter == @lane', inplace = True) # lane-based df
+    
+    det_on = tuple((ldf.loc[ldf['EventID'] == 82])['TimeStamp'])
+    det_off = tuple((ldf.loc[ldf['EventID'] == 81])['TimeStamp'])
+    
+    # filter df for timestamp between first det on and last det off
+    first_det_on, last_det_off = min(det_on), max(det_off)
+    ldf = ldf[(ldf['TimeStamp'] >= first_det_on) & (ldf['TimeStamp'] <= last_det_off)]
+    
+    # compute parameters
+    ODT = Vector(det_off) - Vector(det_on) # on-detector time
 
-# filter df for timestamp between first det on and last det off
-det_on = tuple((ddf9.loc[ddf9['EventID'] == 82])['TimeStamp'])
-det_off = tuple((ddf9.loc[ddf9['EventID'] == 81])['TimeStamp'])
+    lead_headway = Vector(det_on[1:]) - Vector(det_on[:-1]) # leading headway
+    lead_headway.append(None)
+    fol_headway = lead_headway[-1:] + lead_headway[:-1] # following headway
 
-first_det_on, last_det_off = min(det_on), max(det_off)
+    lead_gap = Vector(det_on[1:]) - Vector(det_off[:-1]) # leading gap
+    lead_gap.append(None)
+    fol_gap = lead_gap[-1:] + lead_gap[:-1] # following gap
+    
+    return {'ODT': ODT,
+            'lead_headway': lead_headway, 
+            'fol_headway': fol_headway,
+            'lead_gap': lead_gap,
+            'fol_gap': fol_gap}
 
-ddf9 = ddf9[(ddf9['TimeStamp'] >= first_det_on) & (ddf9['TimeStamp'] <= last_det_off)]
+# =============================================================================
+# merge events data sets
+# =============================================================================
 
-# compute parameters
-ODT = Vector(det_off) - Vector(det_on) # on-detector time
+mdf = pd.concat([pdf, ddf]).sort_values(by = 'TimeStamp')
+mdf = mdf[:-1]
 
-lead_headway = Vector(det_on[1:]) - Vector(det_on[:-1]) # leading headway
-lead_headway.append(None)
-fol_headway = lead_headway[-1:] + lead_headway[:-1] # following headway
+# add signal category
+signal = {8: 'Y', 10: 'R', 1: 'G'}
+mdf['Signal'] = mdf['EventID'].map(signal)
 
-lead_gap = Vector(det_on[1:]) - Vector(det_off[:-1]) # leading gap
-lead_gap.append(None)
-fol_gap = lead_gap[-1:] + lead_gap[:-1] # following gap
+# add phase data: cycle, cycle length, indication timestamps, indication intervals
+phase_cols = {'Cycle': Cycle,
+              'CycleLen': CycleLen,
+              'YST': yst[:-1],
+              'RST': rst,
+              'GST': gst,
+              'RedTime': RedTime,
+              'GreenTime': GreenTime}
+
+for key, value in phase_cols.items():
+    mdf.loc[mdf['EventID'] == 8, key] = value
+
+# forward fill new columns
+fill_cols = [col for col in phase_cols.keys()]
+fill_cols.append('Signal')
+
+for col in fill_cols: 
+    mdf[col].ffill(inplace = True)
+
+# other phase-detection parameters
+mdf['AIC'] = (mdf['TimeStamp'] - mdf['YST']).dt.total_seconds() # arrival in cycle
+mdf['TUG'] = (mdf['GST'] - mdf['TimeStamp']).dt.total_seconds() # time until green
+
+# signal status change
+def computeSSC(lane):
+    detOn = (mdf.loc[(mdf['EventID'] == 82) & (mdf['Parameter'] == lane)])['Signal'].tolist()
+    detOff = (mdf.loc[(mdf['EventID'] == 81) & (mdf['Parameter'] == lane)])['Signal'].tolist()
+    return [i + j for i, j in zip(detOn, detOff)]
+
+for lane in det_stop:
+    mdf.loc[(mdf['EventID'] == 82) & (mdf['Parameter'] == lane), 'SSC'] = computeSSC(lane)
+
+# filter only detection 'on' events
+mdf.query('EventID == 82', inplace = True)
+mdf.drop('EventID', axis = 1, inplace = True)
+
+# add det data: ODT, headway, gap
+det_cols = ['ODT', 'lead_headway', 'fol_headway', 'lead_gap', 'fol_gap']
+
+for col in det_cols:
+    for lane in det_stop:
+        mdf.loc[mdf['Parameter'] == lane, col] = computeParameters(lane)[col]
